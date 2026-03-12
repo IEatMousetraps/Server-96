@@ -292,11 +292,13 @@ footer span{color:var(--gold);}
       </div>
       <div class="admin-login-title">Admin Access</div>
       <div class="admin-login-sub">Server 96 Leadership Only</div>
-      <div class="card card-gold">
-        <div class="f-group"><label>Email</label><input type="email" id="admin-email" placeholder="admin@example.com"></div>
-        <div class="f-group"><label>Password</label><input type="password" id="admin-pass" placeholder="••••••••"></div>
-        <button class="btn btn-primary" style="width:100%;margin-top:.5rem" onclick="adminLogin()">Sign In</button>
-        <div id="login-msg"></div>
+      <div class="card card-gold" style="text-align:center;">
+        <p style="font-size:.85rem;color:var(--text-dim);margin-bottom:1.5rem;line-height:1.6;">Sign in with your Google account.<br>Access is restricted to approved leadership.</p>
+        <button class="btn btn-primary" style="width:100%;display:flex;align-items:center;justify-content:center;gap:.75rem;font-size:.95rem;padding:.85rem 1.4rem;" onclick="adminLogin()">
+          <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
+          Sign in with Google
+        </button>
+        <div id="login-msg" style="margin-top:.75rem;"></div>
       </div>
     </div>
 
@@ -434,7 +436,7 @@ footer span{color:var(--gold);}
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, onSnapshot, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -445,12 +447,12 @@ import { getStorage, ref, uploadString, getDownloadURL, deleteObject }
 // 🔧 REPLACE WITH YOUR FIREBASE CONFIG BELOW
 // ══════════════════════════════════════════
 const firebaseConfig = {
-  apiKey: "AIzaSyA8K_h16cFnztEZ03iFerTNoPON5IB7ZL8",
-  authDomain: "server96-553ed.firebaseapp.com",
-  projectId: "server96-553ed",
-  storageBucket: "server96-553ed.firebasestorage.app",
-  messagingSenderId: "644990271439",
-  appId: "1:644990271439:web:c89d187ce08aa3b3a2dcba"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 // ══════════════════════════════════════════
 
@@ -464,13 +466,23 @@ let _editId   = null;
 let _editPhotoDataUrl = null;
 let _addPhotoDataUrl  = null;
 
+const provider = new GoogleAuthProvider();
+
 // ─── AUTH ───
-onAuthStateChanged(auth, user => {
+onAuthStateChanged(auth, async user => {
   if (user) {
-    document.getElementById('admin-login').style.display = 'none';
-    document.getElementById('admin-panel').classList.add('active');
-    document.getElementById('admin-user-label').textContent = 'Logged in as ' + user.email;
-    listenMembers();
+    // Check if this Google account is in the admins allowlist
+    const { getDoc, doc: firestoreDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const adminSnap = await getDoc(firestoreDoc(db, 'admins', user.email));
+    if (adminSnap.exists()) {
+      document.getElementById('admin-login').style.display = 'none';
+      document.getElementById('admin-panel').classList.add('active');
+      document.getElementById('admin-user-label').textContent = 'Logged in as ' + user.displayName + ' (' + user.email + ')';
+      listenMembers();
+    } else {
+      showMsg('login-msg', 'Access denied. Your Google account is not on the admin list.', 'err');
+      await signOut(auth);
+    }
   } else {
     document.getElementById('admin-login').style.display = 'block';
     document.getElementById('admin-panel').classList.remove('active');
@@ -479,13 +491,12 @@ onAuthStateChanged(auth, user => {
 });
 
 window.adminLogin = async () => {
-  const email = document.getElementById('admin-email').value.trim();
-  const pass  = document.getElementById('admin-pass').value;
   try {
-    await signInWithEmailAndPassword(auth, email, pass);
-    showMsg('login-msg', 'Signed in!', 'ok');
+    await signInWithPopup(auth, provider);
   } catch(e) {
-    showMsg('login-msg', 'Login failed: ' + e.message, 'err');
+    if (e.code !== 'auth/popup-closed-by-user') {
+      showMsg('login-msg', 'Sign-in failed: ' + e.message, 'err');
+    }
   }
 };
 
