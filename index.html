@@ -526,6 +526,13 @@
     document.getElementById('page-' + id).classList.add('active');
     const navMap = { home: 'nav-home', about: 'nav-about', 'admin-login': 'nav-admin', admin: 'nav-admin' };
     if (navMap[id]) document.getElementById(navMap[id]).classList.add('active');
+    sessionStorage.setItem('s96_page', id);
+  }
+
+  // ── RESTORE LAST PAGE ON LOAD ──
+  const savedPage = sessionStorage.getItem('s96_page');
+  if (savedPage && savedPage !== 'admin' && savedPage !== 'admin-login') {
+    showPage(savedPage);
   }
 
   window.adminNav = function() {
