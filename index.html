@@ -510,48 +510,51 @@
   }
 
   // ── AUTH STATE ──
+  // ── SINGLE AUTH STATE LISTENER ──
   onAuthStateChanged(auth, user => {
-    if (user && ADMIN_EMAILS.includes(user.email)) {
-      document.getElementById('adminEmail').textContent = user.email;
-      const av = document.getElementById('adminAvatar');
-      if (user.photoURL) { av.src = user.photoURL; av.style.display = 'block'; }
-    }
-  });
-
-  // ── AUTH STATE + REDIRECT RESULT ──
-  // Use redirect-only flow for ALL browsers — most reliable across
-  // Safari, Firefox mobile, Brave, and any browser with strict cookie/storage policies.
-  // onAuthStateChanged handles the session after redirect completes.
-
-  onAuthStateChanged(auth, user => {
-    if (user && ADMIN_EMAILS.includes(user.email)) {
-      // Valid admin already signed in (session persisted or redirect just completed)
-      const currentPage = document.querySelector('.page.active')?.id;
-      if (currentPage === 'page-admin-login' || currentPage === 'page-home') {
-        showPage('admin');
-        loadMembers();
+    if (user) {
+      // Show avatar/email in admin topbar if authorized
+      if (ADMIN_EMAILS.includes(user.email)) {
+        document.getElementById('adminEmail').textContent = user.email;
+        const av = document.getElementById('adminAvatar');
+        if (user.photoURL) { av.src = user.photoURL; av.style.display = 'block'; }
       }
     }
   });
 
-  // Handle redirect result explicitly (catches the return from Google sign-in)
+  // ── HANDLE REDIRECT RESULT ON PAGE LOAD ──
   getRedirectResult(auth).then(result => {
     if (!result || !result.user) return;
     const user = result.user;
+    const err = document.getElementById('loginError');
+
     if (!ADMIN_EMAILS.includes(user.email)) {
+      // Show exactly what email Google returned so we can debug
       signOut(auth);
-      const err = document.getElementById('loginError');
-      err.textContent = 'Access denied. Your Google account is not authorized.';
+      err.textContent = 'Access denied for: ' + user.email + ' — contact a moderator to be added.';
       err.style.display = 'block';
       showPage('admin-login');
       return;
     }
+
     showPage('admin');
     loadMembers();
   }).catch(e => {
-    // Ignore benign no-redirect-result errors
     if (e.code !== 'auth/no-auth-event') {
-      console.warn('Redirect result error:', e.message);
+      console.warn('Redirect result error:', e.code, e.message);
+    }
+  });
+
+  // ── CHECK PERSISTED SESSION ON LOAD ──
+  // If admin already has an active session, skip the login page
+  auth.authStateReady().then(() => {
+    const user = auth.currentUser;
+    if (user && ADMIN_EMAILS.includes(user.email)) {
+      const currentPage = document.querySelector('.page.active')?.id;
+      if (currentPage === 'page-admin-login') {
+        showPage('admin');
+        loadMembers();
+      }
     }
   });
 
