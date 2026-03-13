@@ -179,7 +179,20 @@
     .btn-delete-confirm { width: 100%; padding: 11px; background: var(--error); color: #fff; font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 0.08em; border: none; border-radius: 3px; cursor: pointer; transition: opacity 0.2s; }
     .btn-delete-confirm:hover { opacity: 0.85; }
 
-    /* SPINNER */
+    /* ADMIN TABS */
+    .admin-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 28px; }
+    .admin-tab { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 0.9rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 12px 24px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1px; transition: all 0.2s; }
+    .admin-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+    .admin-tab:hover { color: var(--gold); }
+    .admin-pane { display: none; }
+    .admin-pane.active { display: block; }
+
+    /* LOG TABLE */
+    .log-action-approve { color: var(--success); font-weight: 700; }
+    .log-action-deny { color: var(--error); font-weight: 700; }
+    .log-action-edit { color: var(--gold); font-weight: 700; }
+    .log-action-delete { color: var(--error); font-weight: 700; }
+    .log-action-revoke { color: #ff9944; font-weight: 700; }
     .loading-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(0,0,0,0.3); border-top-color: #000; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; }
     .loading-spinner-white { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.2); border-top-color: #e8e8e8; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -379,12 +392,19 @@
 <div class="page" id="page-admin">
   <main>
     <div class="admin-topbar">
-      <h2>Applications Dashboard</h2>
+      <h2>Admin Dashboard</h2>
       <div class="admin-user">
         <span id="adminEmailDisplay"></span>
         <button class="logout-btn" onclick="adminLogout()">Sign Out</button>
       </div>
     </div>
+    <div class="admin-tabs">
+      <button class="admin-tab active" id="tab-applications" onclick="switchAdminTab('applications', this)">Applications</button>
+      <button class="admin-tab" id="tab-log" onclick="switchAdminTab('log', this)">Activity Log</button>
+    </div>
+
+    <!-- APPLICATIONS PANE -->
+    <div class="admin-pane active" id="pane-applications">
     <div class="admin-stats">
       <div class="stat-card">
         <div class="stat-num" id="statTotal">—</div>
@@ -425,10 +445,35 @@
         </table>
       </div>
     </div>
-  </main>
-</div>
+    </div><!-- end pane-applications -->
 
-<!-- ── MEMBER DETAIL MODAL ── -->
+    <!-- ACTIVITY LOG PANE -->
+    <div class="admin-pane" id="pane-log">
+      <div class="table-wrap">
+        <div class="table-header">
+          <h3>Activity Log</h3>
+          <button class="filter-tab" onclick="downloadLogCSV()" style="background:var(--gold);color:#000;border-color:var(--gold);">
+            ↓ Download CSV
+          </button>
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Admin</th>
+                <th>Action</th>
+                <th>Member</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="logTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- end pane-log -->
+  </main>
+</div> -->
 <div class="modal-overlay" id="memberModal">
   <div class="modal">
     <button class="modal-close" onclick="closeModal()">✕</button>
@@ -477,7 +522,6 @@
   import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-
   const firebaseConfig = {
     apiKey: "AIzaSyA8K_h16cFnztEZ03iFerTNoPON5IB7ZL8",
     authDomain: "server96-553ed.firebaseapp.com",
@@ -496,13 +540,37 @@
   let currentFilter = 'all';
   let activeMemberId = null;
 
+  // ── WRITE AUDIT LOG ──
+  async function writeLog(action, member, details = '') {
+    try {
+      const user = auth.currentUser;
+      await addDoc(collection(db, 'audit_log'), {
+        timestamp: serverTimestamp(),
+        admin: user ? user.email : 'unknown',
+        action,
+        memberName: member ? `${member.firstName} ${member.lastName}` : '—',
+        memberDiscord: member ? (member.discord || '—') : '—',
+        memberId: member ? member.id : '—',
+        details
+      });
+    } catch(e) { console.warn('Log write failed:', e.message); }
+  }
+
+  // ── ADMIN TAB SWITCHER ──
+  window.switchAdminTab = function(tab, btn) {
+    document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.admin-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('pane-' + tab).classList.add('active');
+    if (tab === 'log') loadLog();
+  }
+
   // ── MEMBER COUNT (public) ──
   async function loadPublicCount() {
     try {
       const snap = await getDocs(collection(db, 'applications'));
       const approved = snap.docs.filter(d => d.data().status === 'approved').length;
       document.getElementById('publicMemberCount').textContent = approved;
-      document.getElementById('aboutMemberCount').textContent = approved;
     } catch(e) {
       document.getElementById('publicMemberCount').textContent = '—';
     }
@@ -512,9 +580,12 @@
   // ── AUTH STATE WATCHER ──
   onAuthStateChanged(auth, user => {
     if (user) {
-      const currentPage = document.querySelector('.page.active')?.id;
-      if (currentPage === 'page-admin-login' || currentPage === 'page-admin') {
-        goAdmin(user);
+      goAdmin(user);
+    } else {
+      // Not logged in — restore saved non-admin page or default to home
+      const saved = sessionStorage.getItem('s96_page');
+      if (saved && saved !== 'admin' && saved !== 'admin-login') {
+        showPage(saved);
       }
     }
   });
@@ -528,14 +599,6 @@
     if (navMap[id]) document.getElementById(navMap[id]).classList.add('active');
     sessionStorage.setItem('s96_page', id);
   }
-
-  // ── RESTORE LAST PAGE ON LOAD ──
-  const savedPage = sessionStorage.getItem('s96_page');
-  if (savedPage && savedPage !== 'admin' && savedPage !== 'admin-login') {
-    showPage(savedPage);
-  }
-
-  window.adminNav = function() {
     const user = auth.currentUser;
     if (user) {
       goAdmin(user);
@@ -732,7 +795,12 @@
     try {
       await updateDoc(doc(db, 'applications', id), { status });
       const m = allMembers.find(x => x.id === id);
-      if (m) m.status = status;
+      if (m) {
+        const prevStatus = m.status;
+        m.status = status;
+        const actionLabel = status === 'approved' ? 'Approved' : status === 'denied' && prevStatus === 'approved' ? 'Revoked' : 'Denied';
+        await writeLog(actionLabel, m, `Status changed from ${prevStatus} → ${status}`);
+      }
       renderTable(currentFilter);
       updateStats();
       loadPublicCount();
@@ -800,7 +868,11 @@
     try {
       await updateDoc(doc(db, 'applications', activeMemberId), updates);
       const m = allMembers.find(x => x.id === activeMemberId);
-      if (m) Object.assign(m, updates);
+      if (m) {
+        const changed = Object.keys(updates).filter(k => updates[k] !== (m[k] || '')).join(', ');
+        Object.assign(m, updates);
+        await writeLog('Edited', m, changed ? `Fields updated: ${changed}` : 'No changes');
+      }
       renderTable(currentFilter);
       viewMember(activeMemberId, 'view');
     } catch(e) {
@@ -815,6 +887,7 @@
     if (!confirm(`Delete application for ${m.firstName} ${m.lastName}? This cannot be undone.`)) return;
     try {
       const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+      await writeLog('Deleted', m, `Application permanently deleted`);
       await deleteDoc(doc(db, 'applications', activeMemberId));
       allMembers = allMembers.filter(x => x.id !== activeMemberId);
       closeModal();
@@ -823,6 +896,69 @@
       loadPublicCount();
     } catch(e) {
       alert('Delete failed: ' + e.message);
+    }
+  }
+
+  // ── LOAD ACTIVITY LOG ──
+  async function loadLog() {
+    const tbody = document.getElementById('logTable');
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px;font-family:\'Barlow Condensed\',sans-serif;"><span class="loading-spinner-white"></span> Loading...</td></tr>';
+    try {
+      const q = query(collection(db, 'audit_log'), orderBy('timestamp', 'desc'));
+      const snap = await getDocs(q);
+      if (snap.empty) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px;font-family:\'Barlow Condensed\',sans-serif;">No activity logged yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = '';
+      snap.docs.forEach(d => {
+        const entry = d.data();
+        const ts = entry.timestamp?.toDate
+          ? entry.timestamp.toDate().toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit' })
+          : '—';
+        const actionLower = (entry.action || '').toLowerCase();
+        const actionClass = actionLower.includes('approv') ? 'log-action-approve'
+          : actionLower.includes('deni') ? 'log-action-deny'
+          : actionLower.includes('revok') ? 'log-action-revoke'
+          : actionLower.includes('delet') ? 'log-action-delete'
+          : actionLower.includes('edit') ? 'log-action-edit'
+          : '';
+        tbody.innerHTML += `
+          <tr>
+            <td style="color:var(--text-muted);white-space:nowrap">${ts}</td>
+            <td style="color:var(--text-muted)">${entry.admin || '—'}</td>
+            <td class="${actionClass}">${entry.action || '—'}</td>
+            <td><strong>${entry.memberName || '—'}</strong>${entry.memberDiscord && entry.memberDiscord !== '—' ? `<br><small style="color:var(--gold)">${entry.memberDiscord}</small>` : ''}</td>
+            <td style="color:var(--text-muted);font-size:0.82rem">${entry.details || '—'}</td>
+          </tr>`;
+      });
+    } catch(e) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--error);padding:32px;">Error loading log: ${e.message}</td></tr>`;
+    }
+  }
+
+  // ── DOWNLOAD CSV ──
+  window.downloadLogCSV = async function() {
+    try {
+      const q = query(collection(db, 'audit_log'), orderBy('timestamp', 'desc'));
+      const snap = await getDocs(q);
+      const rows = [['Timestamp','Admin','Action','Member Name','Discord','Details']];
+      snap.docs.forEach(d => {
+        const e = d.data();
+        const ts = e.timestamp?.toDate ? e.timestamp.toDate().toLocaleString('en-US') : '';
+        const escape = v => `"${(v||'').toString().replace(/"/g,'""')}"`;
+        rows.push([escape(ts), escape(e.admin), escape(e.action), escape(e.memberName), escape(e.memberDiscord), escape(e.details)]);
+      });
+      const csv = rows.map(r => r.join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `server96-activity-log-${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch(e) {
+      alert('Download failed: ' + e.message);
     }
   }
 
