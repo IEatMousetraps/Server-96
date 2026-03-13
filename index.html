@@ -354,7 +354,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
-  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
   const ADMIN_EMAILS = ["francis.kaitlin@gmail.com"];
 
@@ -395,11 +395,26 @@
     }
   });
 
+  // ── HANDLE REDIRECT RESULT ON PAGE LOAD ──
+  getRedirectResult(auth).then(result => {
+    if (!result) return;
+    const user = result.user;
+    if (!ADMIN_EMAILS.includes(user.email)) {
+      signOut(auth);
+      const err = document.getElementById('loginError');
+      err.style.display = 'block';
+      return;
+    }
+    showPage('admin');
+    loadMembers();
+  }).catch(() => {});
+
   // ── ADMIN LOGIN ──
   window.adminLogin = async function() {
     const err = document.getElementById('loginError');
     err.style.display = 'none';
     try {
+      // Try popup first
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
       if (!ADMIN_EMAILS.includes(user.email)) {
@@ -410,8 +425,18 @@
       showPage('admin');
       loadMembers();
     } catch(e) {
-      err.textContent = 'Sign-in failed: ' + e.message;
-      err.style.display = 'block';
+      // Popup failed (blocked or storage-partitioned browser) — fall back to redirect
+      if (['auth/popup-blocked','auth/popup-closed-by-user','auth/cancelled-popup-request'].includes(e.code) || e.message.includes('sessionStorage')) {
+        try {
+          await signInWithRedirect(auth, provider);
+        } catch(e2) {
+          err.textContent = 'Sign-in failed: ' + e2.message;
+          err.style.display = 'block';
+        }
+      } else {
+        err.textContent = 'Sign-in failed: ' + e.message;
+        err.style.display = 'block';
+      }
     }
   }
 
