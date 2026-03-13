@@ -427,11 +427,22 @@
     <div class="table-wrap">
       <div class="table-header">
         <h3>Applications</h3>
-        <div class="filter-tabs">
-          <button class="filter-tab active" onclick="filterMembers('all', this)">All</button>
-          <button class="filter-tab" onclick="filterMembers('pending', this)">Pending</button>
-          <button class="filter-tab" onclick="filterMembers('approved', this)">Approved</button>
-          <button class="filter-tab" onclick="filterMembers('denied', this)">Denied</button>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div class="filter-tabs">
+            <button class="filter-tab active" onclick="filterMembers('all', this)">All</button>
+            <button class="filter-tab" onclick="filterMembers('pending', this)">Pending</button>
+            <button class="filter-tab" onclick="filterMembers('approved', this)">Approved</button>
+            <button class="filter-tab" onclick="filterMembers('denied', this)">Denied</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <select id="csvFilter" style="background:var(--surface2);border:1px solid var(--border);border-radius:3px;color:var(--text);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:0.75rem;letter-spacing:0.1em;text-transform:uppercase;padding:6px 10px;cursor:pointer;outline:none;">
+              <option value="all">All</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="denied">Denied</option>
+            </select>
+            <button class="filter-tab" onclick="downloadMembersCSV()" style="background:var(--gold);color:#000;border-color:var(--gold);white-space:nowrap;">↓ Download CSV</button>
+          </div>
         </div>
       </div>
       <div style="overflow-x:auto">
@@ -945,7 +956,31 @@
     }
   }
 
-  // ── DOWNLOAD CSV ──
+  // ── DOWNLOAD MEMBERS CSV ──
+  window.downloadMembersCSV = function() {
+    const filter = document.getElementById('csvFilter').value;
+    const filtered = filter === 'all' ? allMembers : allMembers.filter(m => m.status === filter);
+    if (!filtered.length) { alert('No records found for that filter.'); return; }
+    const escape = v => `"${(v||'').toString().replace(/"/g,'""')}"`;
+    const rows = [['First Name','Last Name','Email','Discord','City','State','Country','Status','Applied']];
+    filtered.forEach(m => {
+      const submitted = m.submitted?.toDate ? m.submitted.toDate().toLocaleDateString('en-US') : '';
+      rows.push([
+        escape(m.firstName), escape(m.lastName), escape(m.email), escape(m.discord),
+        escape(m.city), escape(m.state), escape(m.country), escape(m.status), escape(submitted)
+      ]);
+    });
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `server96-members-${filter}-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── DOWNLOAD ACTIVITY LOG CSV ──
   window.downloadLogCSV = async function() {
     try {
       const q = query(collection(db, 'audit_log'), orderBy('timestamp', 'desc'));
