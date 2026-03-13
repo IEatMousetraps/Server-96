@@ -582,16 +582,21 @@
   }
   loadPublicCount();
 
+  // ── RESTORE PAGE ON LOAD (non-admin) ──
+  const _savedPage = sessionStorage.getItem('s96_page');
+  if (_savedPage && _savedPage !== 'admin' && _savedPage !== 'admin-login') {
+    showPage(_savedPage);
+  }
+
   // ── AUTH STATE WATCHER ──
   onAuthStateChanged(auth, user => {
-    if (user) {
+    const saved = sessionStorage.getItem('s96_page');
+    if (user && (saved === 'admin' || saved === 'admin-login')) {
       goAdmin(user);
-    } else {
-      // Not logged in — restore saved non-admin page or default to home
-      const saved = sessionStorage.getItem('s96_page');
-      if (saved && saved !== 'admin' && saved !== 'admin-login') {
-        showPage(saved);
-      }
+    } else if (!user && saved && saved !== 'admin' && saved !== 'admin-login') {
+      showPage(saved);
+    } else if (!user) {
+      // default, do nothing — HTML already shows home page
     }
   });
 
