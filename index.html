@@ -604,6 +604,8 @@
     if (navMap[id]) document.getElementById(navMap[id]).classList.add('active');
     sessionStorage.setItem('s96_page', id);
   }
+
+  window.adminNav = function() {
     const user = auth.currentUser;
     if (user) {
       goAdmin(user);
