@@ -545,6 +545,31 @@
   let currentFilter = 'all';
   let activeMemberId = null;
 
+  // ── NAVIGATION (defined first so everything can call it) ──
+  window.showPage = function(id) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+    document.getElementById('page-' + id).classList.add('active');
+    const navMap = { home: 'nav-home', about: 'nav-about', 'admin-login': 'nav-admin', admin: 'nav-admin' };
+    if (navMap[id]) document.getElementById(navMap[id]).classList.add('active');
+    sessionStorage.setItem('s96_page', id);
+  }
+
+  window.adminNav = function() {
+    const user = auth.currentUser;
+    if (user) {
+      goAdmin(user);
+    } else {
+      showPage('admin-login');
+    }
+  }
+
+  // ── RESTORE PAGE ON LOAD (non-admin, runs before Firebase resolves) ──
+  const _savedPage = sessionStorage.getItem('s96_page');
+  if (_savedPage && _savedPage !== 'admin' && _savedPage !== 'admin-login') {
+    showPage(_savedPage);
+  }
+
   // ── WRITE AUDIT LOG ──
   async function writeLog(action, member, details = '') {
     try {
@@ -582,10 +607,10 @@
   }
   loadPublicCount();
 
-  // ── RESTORE PAGE ON LOAD (non-admin) ──
-  const _savedPage = sessionStorage.getItem('s96_page');
-  if (_savedPage && _savedPage !== 'admin' && _savedPage !== 'admin-login') {
-    showPage(_savedPage);
+  function goAdmin(user) {
+    document.getElementById('adminEmailDisplay').textContent = user.email;
+    showPage('admin');
+    loadMembers();
   }
 
   // ── AUTH STATE WATCHER ──
@@ -593,37 +618,8 @@
     const saved = sessionStorage.getItem('s96_page');
     if (user && (saved === 'admin' || saved === 'admin-login')) {
       goAdmin(user);
-    } else if (!user && saved && saved !== 'admin' && saved !== 'admin-login') {
-      showPage(saved);
-    } else if (!user) {
-      // default, do nothing — HTML already shows home page
     }
   });
-
-  // ── NAVIGATION ──
-  window.showPage = function(id) {
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
-    document.getElementById('page-' + id).classList.add('active');
-    const navMap = { home: 'nav-home', about: 'nav-about', 'admin-login': 'nav-admin', admin: 'nav-admin' };
-    if (navMap[id]) document.getElementById(navMap[id]).classList.add('active');
-    sessionStorage.setItem('s96_page', id);
-  }
-
-  window.adminNav = function() {
-    const user = auth.currentUser;
-    if (user) {
-      goAdmin(user);
-    } else {
-      showPage('admin-login');
-    }
-  }
-
-  function goAdmin(user) {
-    document.getElementById('adminEmailDisplay').textContent = user.email;
-    showPage('admin');
-    loadMembers();
-  }
 
   // ── ADMIN LOGIN (email/password) ──
   window.adminLogin = async function() {
