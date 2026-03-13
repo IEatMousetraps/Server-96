@@ -501,7 +501,7 @@
 
   // ── NAVIGATION ──
   window.showPage = function(id) {
-    if (id === 'admin' && !auth.currentUser) { showPage('admin-login'); return; }
+    // Never block navigation with auth check here — auth is handled on load
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
     document.getElementById('page-' + id).classList.add('active');
@@ -509,53 +509,49 @@
     if (navMap[id] !== undefined) document.querySelectorAll('nav a')[navMap[id]].classList.add('active');
   }
 
-  // ── AUTH STATE ──
-  // ── SINGLE AUTH STATE LISTENER ──
-  onAuthStateChanged(auth, user => {
-    if (user) {
-      // Show avatar/email in admin topbar if authorized
-      if (ADMIN_EMAILS.includes(user.email)) {
-        document.getElementById('adminEmail').textContent = user.email;
-        const av = document.getElementById('adminAvatar');
-        if (user.photoURL) { av.src = user.photoURL; av.style.display = 'block'; }
-      }
-    }
-  });
+  function goAdmin(user) {
+    document.getElementById('adminEmail').textContent = user.email;
+    const av = document.getElementById('adminAvatar');
+    if (user.photoURL) { av.src = user.photoURL; av.style.display = 'block'; }
+    showPage('admin');
+    loadMembers();
+  }
 
-  // ── HANDLE REDIRECT RESULT ON PAGE LOAD ──
+  // ── BOOT SEQUENCE: check redirect result first, then persisted session ──
+  // getRedirectResult resolves immediately (null if no redirect just happened).
+  // We wait for it before doing anything else so the page doesn't flash home first.
   getRedirectResult(auth).then(result => {
-    if (!result || !result.user) return;
-    const user = result.user;
-    const err = document.getElementById('loginError');
-
-    if (!ADMIN_EMAILS.includes(user.email)) {
-      // Show exactly what email Google returned so we can debug
-      signOut(auth);
-      err.textContent = 'Access denied for: ' + user.email + ' — contact a moderator to be added.';
-      err.style.display = 'block';
-      showPage('admin-login');
+    if (result && result.user) {
+      // Just came back from Google redirect
+      const user = result.user;
+      if (!ADMIN_EMAILS.includes(user.email)) {
+        signOut(auth);
+        showPage('admin-login');
+        const err = document.getElementById('loginError');
+        err.textContent = 'Access denied for: ' + user.email;
+        err.style.display = 'block';
+        return;
+      }
+      goAdmin(user);
       return;
     }
 
-    showPage('admin');
-    loadMembers();
-  }).catch(e => {
-    if (e.code !== 'auth/no-auth-event') {
-      console.warn('Redirect result error:', e.code, e.message);
-    }
-  });
-
-  // ── CHECK PERSISTED SESSION ON LOAD ──
-  // If admin already has an active session, skip the login page
-  auth.authStateReady().then(() => {
-    const user = auth.currentUser;
-    if (user && ADMIN_EMAILS.includes(user.email)) {
-      const currentPage = document.querySelector('.page.active')?.id;
-      if (currentPage === 'page-admin-login') {
-        showPage('admin');
-        loadMembers();
+    // No redirect result — check for a persisted session instead
+    auth.authStateReady().then(() => {
+      const user = auth.currentUser;
+      if (user && ADMIN_EMAILS.includes(user.email)) {
+        goAdmin(user);
       }
-    }
+      // else: stay on whatever page is currently active (home by default)
+    });
+
+  }).catch(e => {
+    console.warn('Auth boot error:', e.code, e.message);
+    // On error still check for persisted session
+    auth.authStateReady().then(() => {
+      const user = auth.currentUser;
+      if (user && ADMIN_EMAILS.includes(user.email)) goAdmin(user);
+    });
   });
 
   // ── ADMIN LOGIN — redirect only, works on all browsers ──
