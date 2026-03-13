@@ -499,64 +499,52 @@
     }
   });
 
-  // ── HANDLE REDIRECT RESULT ON PAGE LOAD ──
+  // ── AUTH STATE + REDIRECT RESULT ──
+  // Use redirect-only flow for ALL browsers — most reliable across
+  // Safari, Firefox mobile, Brave, and any browser with strict cookie/storage policies.
+  // onAuthStateChanged handles the session after redirect completes.
+
+  onAuthStateChanged(auth, user => {
+    if (user && ADMIN_EMAILS.includes(user.email)) {
+      // Valid admin already signed in (session persisted or redirect just completed)
+      const currentPage = document.querySelector('.page.active')?.id;
+      if (currentPage === 'page-admin-login' || currentPage === 'page-home') {
+        showPage('admin');
+        loadMembers();
+      }
+    }
+  });
+
+  // Handle redirect result explicitly (catches the return from Google sign-in)
   getRedirectResult(auth).then(result => {
-    if (!result) return;
+    if (!result || !result.user) return;
     const user = result.user;
     if (!ADMIN_EMAILS.includes(user.email)) {
       signOut(auth);
       const err = document.getElementById('loginError');
+      err.textContent = 'Access denied. Your Google account is not authorized.';
       err.style.display = 'block';
+      showPage('admin-login');
       return;
     }
     showPage('admin');
     loadMembers();
-  }).catch(() => {});
+  }).catch(e => {
+    // Ignore benign no-redirect-result errors
+    if (e.code !== 'auth/no-auth-event') {
+      console.warn('Redirect result error:', e.message);
+    }
+  });
 
-  // ── ADMIN LOGIN ──
-  // Safari blocks popups and partitions sessionStorage, so we detect it
-  // and go straight to redirect — skipping popup entirely.
-  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-
+  // ── ADMIN LOGIN — redirect only, works on all browsers ──
   window.adminLogin = async function() {
     const err = document.getElementById('loginError');
     err.style.display = 'none';
-
-    if (isSafari) {
-      // Safari: always use redirect, never popup
-      try {
-        await signInWithRedirect(auth, provider);
-      } catch(e) {
-        err.textContent = 'Sign-in failed: ' + e.message;
-        err.style.display = 'block';
-      }
-      return;
-    }
-
-    // All other browsers: try popup
     try {
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      if (!ADMIN_EMAILS.includes(user.email)) {
-        await signOut(auth);
-        err.style.display = 'block';
-        return;
-      }
-      showPage('admin');
-      loadMembers();
+      await signInWithRedirect(auth, provider);
     } catch(e) {
-      // Popup blocked — fall back to redirect
-      if (['auth/popup-blocked','auth/popup-closed-by-user','auth/cancelled-popup-request'].includes(e.code)) {
-        try {
-          await signInWithRedirect(auth, provider);
-        } catch(e2) {
-          err.textContent = 'Sign-in failed: ' + e2.message;
-          err.style.display = 'block';
-        }
-      } else {
-        err.textContent = 'Sign-in failed: ' + e.message;
-        err.style.display = 'block';
-      }
+      err.textContent = 'Sign-in failed: ' + e.message;
+      err.style.display = 'block';
     }
   }
 
