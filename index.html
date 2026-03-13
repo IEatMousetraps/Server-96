@@ -536,22 +536,19 @@
       return;
     }
 
-    // No redirect result — check for a persisted session instead
+    // No redirect result — check for a persisted session only if
+    // the user explicitly navigated to the admin login page
     auth.authStateReady().then(() => {
       const user = auth.currentUser;
-      if (user && ADMIN_EMAILS.includes(user.email)) {
+      const currentPage = document.querySelector('.page.active')?.id;
+      if (user && ADMIN_EMAILS.includes(user.email) && currentPage === 'page-admin-login') {
         goAdmin(user);
       }
-      // else: stay on whatever page is currently active (home by default)
+      // else: leave them on whatever page they landed on
     });
 
   }).catch(e => {
     console.warn('Auth boot error:', e.code, e.message);
-    // On error still check for persisted session
-    auth.authStateReady().then(() => {
-      const user = auth.currentUser;
-      if (user && ADMIN_EMAILS.includes(user.email)) goAdmin(user);
-    });
   });
 
   // ── ADMIN LOGIN — redirect only, works on all browsers ──
