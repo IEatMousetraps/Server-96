@@ -517,12 +517,11 @@
     loadMembers();
   }
 
-  // ── BOOT SEQUENCE: check redirect result first, then persisted session ──
-  // getRedirectResult resolves immediately (null if no redirect just happened).
-  // We wait for it before doing anything else so the page doesn't flash home first.
+  // ── BOOT SEQUENCE ──
   getRedirectResult(auth).then(result => {
     if (result && result.user) {
-      // Just came back from Google redirect
+      // Returning from Google redirect
+      sessionStorage.removeItem('s96_admin_intent');
       const user = result.user;
       if (!ADMIN_EMAILS.includes(user.email)) {
         signOut(auth);
@@ -536,28 +535,48 @@
       return;
     }
 
-    // No redirect result — check for a persisted session only if
-    // the user explicitly navigated to the admin login page
+    // No redirect — check intent flag first (set before redirect was triggered)
+    const intent = sessionStorage.getItem('s96_admin_intent');
+    if (intent === 'login') {
+      // They were trying to log in — check if session came through
+      sessionStorage.removeItem('s96_admin_intent');
+      auth.authStateReady().then(() => {
+        const user = auth.currentUser;
+        if (user && ADMIN_EMAILS.includes(user.email)) {
+          goAdmin(user);
+        } else {
+          showPage('admin-login');
+        }
+      });
+      return;
+    }
+
+    // Normal page load — only auto-route to admin if already authenticated
     auth.authStateReady().then(() => {
       const user = auth.currentUser;
-      const currentPage = document.querySelector('.page.active')?.id;
-      if (user && ADMIN_EMAILS.includes(user.email) && currentPage === 'page-admin-login') {
-        goAdmin(user);
+      if (user && ADMIN_EMAILS.includes(user.email)) {
+        const currentPage = document.querySelector('.page.active')?.id;
+        if (currentPage === 'page-admin-login') {
+          goAdmin(user);
+        }
       }
-      // else: leave them on whatever page they landed on
     });
 
   }).catch(e => {
     console.warn('Auth boot error:', e.code, e.message);
+    sessionStorage.removeItem('s96_admin_intent');
   });
 
-  // ── ADMIN LOGIN — redirect only, works on all browsers ──
+  // ── ADMIN LOGIN ──
   window.adminLogin = async function() {
     const err = document.getElementById('loginError');
     err.style.display = 'none';
     try {
+      // Flag intent before redirect — page will be wiped and reloaded by Google
+      sessionStorage.setItem('s96_admin_intent', 'login');
       await signInWithRedirect(auth, provider);
     } catch(e) {
+      sessionStorage.removeItem('s96_admin_intent');
       err.textContent = 'Sign-in failed: ' + e.message;
       err.style.display = 'block';
     }
@@ -565,6 +584,7 @@
 
   window.adminLogout = async function() {
     await signOut(auth);
+    sessionStorage.removeItem('s96_admin_intent');
     showPage('admin-login');
   }
 
