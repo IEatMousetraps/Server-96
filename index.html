@@ -3,52 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Passport-Style Bingo</title>
+    <title>Bingo System</title>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
     <link rel="stylesheet" href="styles.css">
-    <script src="script.js"></script>
 </head>
 <body>
-    <header>
-        <h1>Welcome to the Passport-Style Bingo System</h1>
-        <nav>
-            <ul>
-                <li><a href="#member-dashboard">Member Dashboard</a></li>
-                <li><a href="#admin-review">Admin Review</a></li>
-                <li><a href="#progress-tracking">Real-Time Progress Tracking</a></li>
-                <li><a href="#prize-drawing">Prize Drawing</a></li>
-                <li><a href="#visibility-toggle">Visibility Toggle</a></li>
-            </ul>
-        </nav>
-    </header>
-    <main>
-        <section id="member-dashboard">
-            <h2>Member Dashboard</h2>
-            <p>Manage your participation and track your bingo progress.</p>
-            <!-- Member Dashboard Content -->
-        </section>
-        <section id="admin-review">
-            <h2>Admin Review</h2>
-            <p>Administrators can review member activities and progress.</p>
-            <!-- Admin Review Content -->
-        </section>
-        <section id="progress-tracking">
-            <h2>Real-Time Progress Tracking</h2>
-            <p>Track your progress and see how many bingos you've achieved in real-time.</p>
-            <!-- Progress Tracking Content -->
-        </section>
-        <section id="prize-drawing">
-            <h2>Prize Drawing</h2>
-            <p>Details of prize drawing events and eligibility criteria.</p>
-            <!-- Prize Drawing Content -->
-        </section>
-        <section id="visibility-toggle">
-            <h2>Visibility Toggle</h2>
-            <p>Control who can see your bingo progress.</p>
-            <!-- Visibility Toggle Content -->
-        </section>
-    </main>
-    <footer>
-        <p>&copy; 2026 IEatMousetraps. All rights reserved.</p>
-    </footer>
+    <div id="member-dashboard">
+        <h1>Bingo Dashboard</h1>
+        <div id="grid">
+            <!-- 25-square grid for bingo -->
+            <table>
+                <tbody>
+                    <!-- Generate 5 rows of 5 squares -->
+                    <script>
+                        for (let i = 0; i < 5; i++) {
+                            document.write('<tr>');
+                            for (let j = 0; j < 5; j++) {
+                                document.write('<td data-square="'+ (i*5 + j + 1) +'">'+ (i*5 + j + 1) +'</td>');
+                            }
+                            document.write('</tr>');
+                        }
+                    <\/script>
+                </tbody>
+            </table>
+        </div>
+        <button id="claim-square">Claim Square</button>
+        <div id="row-detection"></div>
+    </div>
+    <div id="admin-panels" style="display: none;">
+        <h2>Admin Panels</h2>
+        <!-- Tab for submitted boards review -->
+        <div id="review-submitted-boards">
+            <h3>Submitted Boards Review</h3>
+            <div id="boards-review-content"></div>
+        </div>
+        <!-- Progress tracking tab -->
+        <div id="member-progress-tracking">
+            <h3>Member Progress Tracking</h3>
+            <div id="progress-tracking-content"></div>
+        </div>
+        <!-- Prize drawing tab -->
+        <div id="prize-drawing">
+            <h3>Prize Drawing</h3>
+            <div id="prize-drawing-content"></div>
+        </div>
+        <!-- Bingo settings tab -->
+        <div id="bingo-settings">
+            <h3>Bingo Settings</h3>
+            <label for="bingo-visibility">Show Bingo to Members:</label>
+            <input type="checkbox" id="bingo-visibility" onchange="toggleBingoVisibility()">
+        </div>
+    </div>
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: 'YOUR_API_KEY',
+            authDomain: 'YOUR_PROJECT_ID.firebaseapp.com',
+            projectId: 'YOUR_PROJECT_ID',
+            storageBucket: 'YOUR_PROJECT_ID.appspot.com',
+            messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+            appId: 'YOUR_APP_ID'
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore(app);
+
+        // Function to claim a square
+        document.getElementById('claim-square').onclick = () => {
+            const claimedSquare = /* logic to get selected square */;
+            db.collection('bingo_claims').add({
+                square: claimedSquare,
+                user: 'current_user_id',
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        };
+
+        // Function to toggle Bingo visibility
+        function toggleBingoVisibility() {
+            const isVisible = document.getElementById('bingo-visibility').checked;
+            db.collection('bingo_settings').doc('visibility').set({ visible: isVisible });
+        }
+        // Other functionalities...
+    </script>
 </body>
 </html>
