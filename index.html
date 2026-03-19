@@ -3,64 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bingo System</title>
+    <title>Passport-Style Bingo</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="script.js"></script>
 </head>
 <body>
-    <div id="bingo-container">
-        <h1>Quarterly Bingo</h1>
-        <div id="bingo-grid">
-            <!-- 25-square grid will be dynamically generated here -->
-        </div>
-        <button id="claim-button">Claim Square</button>
-    </div>
-    <div id="admin-dashboard" style="display:none;">
-        <h2>Admin Bingo Dashboard</h2>
-        <ul>
-            <li><a href="#submitted-boards">Submitted Boards</a></li>
-            <li><a href="#member-progress">Member Progress</a></li>
-            <li><a href="#prize-drawing">Prize Drawing</a></li>
-        </ul>
-        <!-- Admin sections will go here -->
-    </div>
-    <script src="firebase.js"></script>
-    <script>
-        // Firebase Config
-        const firebaseConfig = { /* your config */ };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-
-        // Bingo functionality
-        const bingoGrid = document.getElementById('bingo-grid');
-        const claimButton = document.getElementById('claim-button');
-
-        // Generate 25 squares for bingo
-        function generateBingoGrid() {
-            for (let i = 0; i < 25; i++) {
-                const square = document.createElement('div');
-                square.classList.add('bingo-square');
-                square.dataset.row = Math.floor(i / 5);
-                square.dataset.col = i % 5;
-                square.addEventListener('click', claimSquare);
-                bingoGrid.appendChild(square);
-            }
-        }
-
-        // Claim square
-        function claimSquare(event) {
-            const square = event.target;
-            // Logic to handle square claiming
-        }
-
-        // Row detection logic
-        function checkWinningRows() {
-            // Logic for detecting rows
-        }
-
-        // Admin functionality for drawing entries and progress tracking
-
-        // Generate Bingo Grid on Load
-        window.onload = generateBingoGrid;
-    </script>
+    <header>
+        <h1>Welcome to the Passport-Style Bingo System</h1>
+        <nav>
+            <ul>
+                <li><a href="#member-dashboard">Member Dashboard</a></li>
+                <li><a href="#admin-review">Admin Review</a></li>
+                <li><a href="#progress-tracking">Real-Time Progress Tracking</a></li>
+                <li><a href="#prize-drawing">Prize Drawing</a></li>
+                <li><a href="#visibility-toggle">Visibility Toggle</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <section id="member-dashboard">
+            <h2>Member Dashboard</h2>
+            <p>Manage your participation and track your bingo progress.</p>
+            <!-- Member Dashboard Content -->
+        </section>
+        <section id="admin-review">
+            <h2>Admin Review</h2>
+            <p>Administrators can review member activities and progress.</p>
+            <!-- Admin Review Content -->
+        </section>
+        <section id="progress-tracking">
+            <h2>Real-Time Progress Tracking</h2>
+            <p>Track your progress and see how many bingos you've achieved in real-time.</p>
+            <!-- Progress Tracking Content -->
+        </section>
+        <section id="prize-drawing">
+            <h2>Prize Drawing</h2>
+            <p>Details of prize drawing events and eligibility criteria.</p>
+            <!-- Prize Drawing Content -->
+        </section>
+        <section id="visibility-toggle">
+            <h2>Visibility Toggle</h2>
+            <p>Control who can see your bingo progress.</p>
+            <!-- Visibility Toggle Content -->
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2026 IEatMousetraps. All rights reserved.</p>
+    </footer>
 </body>
 </html>
