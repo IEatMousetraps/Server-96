@@ -607,16 +607,33 @@
   }
 
   // ── MEMBER COUNT (public) ──
+  // Reads from public_stats/memberCount — a world-readable doc that never
+  // exposes individual application data. Safe for unauthenticated visitors.
   async function loadPublicCount() {
     try {
-      const snap = await getDocs(collection(db, 'applications'));
-      const approved = snap.docs.filter(d => d.data().status === 'approved').length;
-      document.getElementById('publicMemberCount').textContent = approved;
+      const { getDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+      const snap = await getDoc(doc(db, 'public_stats', 'memberCount'));
+      const count = snap.exists() ? (snap.data().approved ?? 0) : 0;
+      document.getElementById('publicMemberCount').textContent = count;
     } catch(e) {
       document.getElementById('publicMemberCount').textContent = '—';
     }
   }
   loadPublicCount();
+
+  // ── SYNC PUBLIC COUNT (admin-only, called after any status change) ──
+  // Recounts approved members from the full collection and writes to
+  // public_stats/memberCount so the public nav counter stays accurate.
+  async function syncPublicCount() {
+    try {
+      const { setDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+      const approved = allMembers.filter(m => m.status === 'approved').length;
+      await setDoc(doc(db, 'public_stats', 'memberCount'), { approved });
+      document.getElementById('publicMemberCount').textContent = approved;
+    } catch(e) {
+      console.warn('syncPublicCount failed:', e.message);
+    }
+  }
 
   function goAdmin(user) {
     document.getElementById('adminEmailDisplay').textContent = user.email;
@@ -822,7 +839,7 @@
       }
       renderTable(currentFilter);
       updateStats();
-      loadPublicCount();
+      await syncPublicCount();
     } catch(e) {
       alert('Update failed: ' + e.message);
     }
@@ -912,7 +929,7 @@
       closeModal();
       renderTable(currentFilter);
       updateStats();
-      loadPublicCount();
+      await syncPublicCount();
     } catch(e) {
       alert('Delete failed: ' + e.message);
     }
